@@ -1,0 +1,53 @@
+#pipeline to perform reconstructions and prediction on cMDH and SOD
+
+
+#ASR reconstruction with custom phylogenetic models
+
+#classical ASR, optimization and reconstruction on MDH sequences
+python main.py --input ../MDH_foldx4/MDH_sequences_aligned.fasta --encode aa -t ./gene_alignments/genes/T6.tre -nt 3 -o MDH_T6 -a 0 --asr 1
+python main.py --input ../MDH_foldx4/MDH_sequences_aligned.fasta --encode aa -t ./gene_alignments/genes/T9.tre -nt 3 -o MDH_T9 -a 0 --asr 1
+python main.py --input ../SOD_foldx4/SOD_sequences_aligned.fasta --encode aa -t ./gene_alignments/genes/T6.tre -nt 3 -o SOD_T6 -a 0 --asr 1
+python main.py --input ../SOD_foldx4/SOD_sequences_aligned.fasta --encode aa -t ./gene_alignments/genes/T9.tre -nt 3 -o SOD_T9 -a 0 --asr 1
+
+#ASR with varying amino acid frequencies, from pre-optimized models
+python reco_marginal_model.py --input ../MDH_foldx4/MDH_sequences_aligned.fasta --encode aa --model ./resultat_optim_0missing/T6_log_command_2_axis.csv -o MDH_T6_0missing --vectors ./Alvinellidae_0missing_eigenvectors.txt -a 2 --asr 1
+python reco_marginal_model.py --input ../MDH_foldx4/MDH_sequences_aligned.fasta --encode aa --model ./resultat_optim_0missing/T9_log_command_2_axis.csv -o MDH_T9_0missing --vectors ./Alvinellidae_0missing_eigenvectors.txt -a 2 --asr 1
+python reco_marginal_model.py --input ../SOD_foldx4/SOD_sequences_aligned.fasta --encode aa --model ./resultat_optim_0missing/T6_log_command_2_axis.csv -o SOD_T6_0missing --vectors ./Alvinellidae_0missing_eigenvectors.txt -a 2 --asr 1
+python reco_marginal_model.py --input ../SOD_foldx4/SOD_sequences_aligned.fasta --encode aa --model ./resultat_optim_0missing/T9_log_command_2_axis.csv -o SOD_T9_0missing --vectors ./Alvinellidae_0missing_eigenvectors.txt -a 2 --asr 1
+
+
+#create files for FoldX
+python sampling_seq.py #samples 1000 alternative sequences in every reconstruction, for selected ancestors, rounding posterior probabilities below 5%
+python create_mut_file_mdh.py #foldx "individual_list" mutation file for calibration with expressed MDH sequences, mutations from a reference sequence
+python create_mut_file_mdh_sample.py #foldx "individual_list" mutation file for sampled MDH sequences, mutations from a reference sequence
+python repartir_mut.py #divides the whole sampled individual_list into 16 sub-lists to parallelize
+
+
+#FoldX prediction from expressed sequences. Done similarly for relaxed models, and unrelaxed not repaired models
+../foldxMacC11/foldx_20241231 --command=RepairPDB --pdb=Anc10_678cb_unrelaxed_rank_001_alphafold2_multimer_v3_model_5_seed_000.pdb #MDH consensus
+../foldxMacC11/foldx_20241231 --command=RepairPDB --pdb=T6_b7ac3_unrelaxed_rank_001_alphafold2_multimer_v3_model_5_seed_000.pdb #MDH T6
+../foldxMacC11/foldx_20241231 --command=RepairPDB --pdb=T9_cfdac_unrelaxed_rank_001_alphafold2_multimer_v3_model_5_seed_000.pdb #MDH T9
+../foldxMacC11/foldx_20241231 --command=RepairPDB --pdb=sod_consensus_7b6f2_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000.pdb #SOD consensus
+../foldxMacC11/foldx_20241231 --command=RepairPDB --pdb=SOD_Anc1_2d5b2_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000.pdb #SOD T6
+../foldxMacC11/foldx_20241231 --command=RepairPDB --pdb=SOD_Anc1_T9_2ba6e_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000.pdb #SOD T9
+
+../foldxMacC11/foldx_20241231 --command=BuildModel --pdb=Anc10_678cb_unrelaxed_rank_001_alphafold2_multimer_v3_model_5_seed_000_Repair.pdb --mutant-file=individual_list_mut_calib_Anc10.txt
+../foldxMacC11/foldx_20241231 --command=BuildModel --pdb=T6_b7ac3_unrelaxed_rank_001_alphafold2_multimer_v3_model_5_seed_000_Repair.pdb --mutant-file=individual_list_mut_calib_T6.txt
+../foldxMacC11/foldx_20241231 --command=BuildModel --pdb=T9_cfdac_unrelaxed_rank_001_alphafold2_multimer_v3_model_5_seed_000_Repair.pdb --mutant-file=individual_list_mut_calib_T9.txt
+../foldxMacC11/foldx_20241231 --command=BuildModel --pdb=sod_consensus_7b6f2_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000_Repair.pdb --mutant-file=individual_list_mut_file_sod.txt
+../foldxMacC11/foldx_20241231 --command=BuildModel --pdb=SOD_Anc1_2d5b2_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000_Repair.pdb --mutant-file=individual_list_mut_file_T6.txt
+../foldxMacC11/foldx_20241231 --command=BuildModel --pdb=SOD_Anc1_T9_2ba6e_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000_Repair.pdb --mutant-file=individual_list_mut_file_T9.txt
+
+
+#Calibration on expressed sequences
+python make_calib_scores.py > scores_repaired.txt #for each model
+python regression_calib.py scores_repaired.txt
+
+
+#FoldX prediction from sampled sequences
+../foldxMacC11/foldx_20241231 --command=BuildModel --pdb=T9_cfdac_unrelaxed_rank_001_alphafold2_multimer_v3_model_5_seed_000_Repair.pdb --mutant-file=individual_list_095_1000rep.txt
+../foldxMacC11/foldx_20241231 --command=BuildModel --pdb=SOD_Anc1_2d5b2_unrelaxed_rank_001_alphafold2_multimer_v3_model_1_seed_000_Repair.pdb --mutant-file=individual_list.txt
+python score_sampled_seq.py
+
+#Figure
+python violin_plot.py

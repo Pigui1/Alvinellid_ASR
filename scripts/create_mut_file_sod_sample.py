@@ -1,0 +1,36 @@
+def make_mut(sequences,wt):
+	top_r = []
+	for s in sequences:
+		i = 1
+		top = ''
+		while i <= len(wt):
+			if wt[i-1] != s[i-1]:
+				if len(top)>0:
+					top += ','
+				top += wt[i-1]+'A'+str(i)+s[i-1]+','+wt[i-1]+'B'+str(i)+s[i-1]
+			i+=1
+		top += ';'
+		top_r.append(top)
+	return top_r
+
+
+with open('./sampled_seq_095_1000rep.fa','r') as fin:
+	ll = fin.readlines()
+
+sequences = []
+seq_name = []
+for l in ll:
+	if l[0] != '>':
+		sequences.append(l.strip('\n'))
+	else:
+		seq_name.append(l)
+
+
+
+wt_T6 = 'MAIHAVCVLKGDGPVTGTIHLKEEGNTVTVTGEITGLTPGKHGFHVHEFGDNTNGCTSAGGHFNPHGKEHGAPEDENRHAGDLGNVVAGEDGKAVINMTDKLVKLTGPNSVIGRTLVVHVDEDDLGRGGHEQSKITGNAGGRLACGVIGITKA'
+
+top_r = make_mut(sequences,wt_T6)
+
+for i,j in zip(seq_name,top_r):
+	print(i.strip())
+	print(j)
